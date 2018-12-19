@@ -1,0 +1,257 @@
+<html>
+<head>
+  <title>send</title>
+  <style type="text/css">
+    body { width: 100%; height: 100%; }
+    #sendbox {
+      float: left; clear: left;
+      width: 284px;
+      border: #000 solid 1px;
+      border-radius: 8px;
+    }
+    #map {
+      position: absolute;
+      top: 0; bottom: 0;
+      left: 0; right: 0;
+      z-index: -1;
+    }
+/* shift-space for autospacing */
+    #servtgt {
+      width: 280px; height: 60px;
+      word-wrap: break-word;
+      border: #000 solid 1px;
+      border-radius: 8px;
+    }
+    #servbox {
+      float: left; clear: none;
+      border: #000 solid 1px;
+      border-radius: 4px;
+    }
+    #servopt {
+      float: left; clear: none;
+      border: #000 solid 1px;
+      border-radius: 4px;
+    }
+    #servopt > * {
+      float: left; clear: none;
+    }
+    #servopt .button {
+      border: #000 solid 1px;
+      border-radius: 4px;
+      margin: 1px;
+      padding: 4px;
+      width: 20px;
+      height: 20px;
+      text-align: center;
+      line-height: 20px;
+      font-weight: bold;
+      font-family: monospace;
+      color: #00f;
+    }
+    #servopt .button:hover {
+      background-color: #000;
+      border-radius: 6px;
+      color: #fc3;
+      cursor: pointer;
+    }
+    #pendbuf {
+      border: #000 solid 1px;
+      border-radius: 4px;
+      margin: 1px;
+      margin-top: 0px;
+      font-size: 12px;
+      font-weight: bold;
+      width: 280px; height: 80px;
+    }
+    #servsend > form {
+      margin: 0; padding: 0;
+      float: right; clear: none;
+    }
+    #sendbuf {
+      width: 249px; height: 30px;
+      border: #000 solid 1px;
+      border-radius: 4px;
+      margin: 1px;
+      margin-left: 2px;
+      font-size: 6px;
+      line-height: 6px;
+    }
+  </style>
+  <script type="text/javascript">
+    function $$(id) { return document.getElementById(id); }
+    function pagename() {
+      var pageref = document.location.href;
+      var namepos = pageref.indexOf('#');
+      var hasname = (namepos != -1) ? 1 : 0;
+      var pageurl = (hasname == 1) ? pageref.substr(0, pageref.indexOf('#')) : pageref;
+      var name = (hasname == 0) ? "" : pageref.substr(namepos + 1);
+      return name;
+    }
+    function setpagename(newpagename) {
+      var pageref = document.location.href;
+      var namepos = pageref.indexOf('#');
+      var hasname = (namepos != -1) ? 1 : 0;
+      var pageurl = (hasname == 1) ? pageref.substr(0, pageref.indexOf('#')) : pageref;
+      document.location.href = pageurl + '#' + escape(newpagename);
+    }
+    var maps = [];
+    var markers = [];
+    var samplecount = 0;
+    var trigger = undefined;
+    var gpsopt = {
+      enableHighAccuracy: true,
+      timeout: 1000,
+      maximumAge: 10000
+    };
+    var pendcount = 0;
+    var llatc = "0", llongc = "0", laccv = "0";
+    logcoord = function(lati, long, accu) {
+      var name = pagename();
+      if (pendcount == 0) {
+        var now = new Date();
+        var stamp = now.getFullYear().toString().substr(-2);
+        if (now.getMonth() + 1 < 10)
+          { stamp += '0' + (now.getMonth() + 1); }
+        else { stamp += '' + (now.getMonth() + 1); }
+        if (now.getDate() < 10)
+          { stamp += '0' + now.getDate(); }
+        else { stamp += '' + now.getDate(); }
+        if (now.getHours() < 10)
+          { stamp += '+0' + now.getHours(); }
+        else { stamp += '+' + now.getHours(); }
+        if (now.getMinutes() < 10)
+          { stamp += '0' + now.getMinutes(); }
+        else { stamp += '' + now.getMinutes(); }
+        if (now.getSeconds() < 10)
+          { stamp += '0' + now.getSeconds(); }
+        else { stamp += '' + now.getSeconds(); }
+        $$('pendbuf').innerHTML = stamp + ' { ';
+      //  $$('pendbuf').innerHTML += '\n' + '  ' + accu + '.' + lati + '.' + long;
+      } // else {
+      if (lati == llatc && long == llongc && accu == laccv) {
+        var cval = $$('pendbuf').innerHTML;
+        var ovix = cval.lastIndexOf('+');
+        var oval = cval.substr(ovix);
+        if (ovix != -1 && oval.substr(0, 1) == '+' && !isNaN(oval.substr(1))) {
+          var newo = '+' + (1 + parseInt(oval.substr(1)));
+          $$('pendbuf').innerHTML = cval.substr(0, ovix) + newo;
+        } else { $$('pendbuf').innerHTML += ' +1'; }
+      } else {
+        if (pendcount > 0) { $$('pendbuf').innerHTML += ' ' };
+        $$('pendbuf').innerHTML += accu + '.' + lati + '.' + long;
+      }
+      //}
+      llatc = lati; llongc = long; laccv = accu;
+      if (++pendcount % 5 == 0) { // AND cancurrentlysend .....
+        $$('pendbuf').innerHTML += ' }';
+        $$('sendbuf').innerHTML = $$('pendbuf').innerHTML;
+        $$('sendbuf').style.backgroundColor = '#fc3';
+        $$('pendbuf').innerHTML = '';
+        pendcount = 0;
+        $$('fsend').submit(); // update name after current packet
+      }
+    };
+    var success = function() {
+      var servdata = $$('servtgt').contentWindow.document.body.innerHTML;
+      var servjson = JSON.parse(servdata);
+      $$('sendbuf').innerHTML = '';
+      var pname = pagename();
+      var tgtsrc = $$('servtgt').src;
+      if (tgtsrc.substr(-3) == '?++') { // init packet / no name
+        $$('sendbuf').style.backgroundColor = '#ff3';
+        if (servjson.id && pname == "") {
+          setpagename(servjson.id);
+          console.log('-- << ' + servjson.id);
+        }
+        $$('fname').value = pagename();
+        $$('servtgt').src = tgtsrc + $$('fname').value; // resend
+      } else {                          // name was presumably sent
+        if (pname != $$('fname').value) { // make sure name hasn't changed
+          if (trigger) { clearTimeout(trigger); console.log('-- ...'); }
+          var tgtsrc = $$('servtgt').src;
+          tgtsrc = tgtsrc.substr(0, tgtsrc.indexOf('?')) + '?++';
+          $$('sendbuf').style.backgroundColor = '#ff3';
+          $$('fname').value = pname; // update with new pagename();
+          $$('servtgt').src = tgtsrc + $$('fname').value; // resend
+        } // else { $$('fsend').submit(); }
+          else { // indeed it has not
+          $$('sendbuf').style.backgroundColor = '#3f3';
+          if (servjson.op) {
+            console.log('-- ' + servjson.op + ' >> ' + servjson.in);
+            sampleupdate(); // start sampling (= or +)
+          } else if (servjson.fail) {
+            console.log('-- !! ' + servjson.fail);
+          } else {
+            // there are n samples now stored
+            console.log('-- ' + servdata + ' --');
+          }
+        }
+      }
+    };
+    var update = function() {
+      navigator.geolocation.getCurrentPosition(gpsplot, gpsfail, gpsopt);
+//      if (somereasontostop) {
+//        trigger = undefined; // no need for clearTimeout()
+//      } else {
+      trigger = setTimeout(update, ticknext);
+//      }
+    }; // creates cascade of triggers
+    var updatestart = function() {
+      if (trigger) { clearTimeout(trigger); }
+      trigger = setTimeout(update, ticknext);
+    }; // creates initial trigger to start cascade
+    var gpsplot = function(pos) {
+      samplecount++;
+      var coords = pos.coords;
+      var latc = coords.latitude.toFixed(8);
+      var longc = coords.longitude.toFixed(8);
+      var accv = coords.accuracy.toFixed(1);
+      logcoord(latc, longc, accv);
+    };
+    var gpsfail = function(err) {
+      console.warn('gpsfail: [' + err.code + '] ' + err.message);
+    };
+    var tickslow = 5000;
+    var tickfast = 1000;
+    var ticknext = tickfast;
+    function sampleupdate() {
+      if (trigger) { clearTimeout(trigger); }
+      navigator.geolocation.getCurrentPosition(gpsplot, gpsfail, gpsopt);
+      updatestart(); // (re)start timed updates
+    }
+    function nosampleupdate() {
+      if (trigger) { clearTimeout(trigger); }
+      updatestart(); // (re)start timed updates
+    }
+    function togglespeed() {
+      var tickto = $$('servspeed').innerHTML;
+      if (tickto == 'F') {
+        ticknext = tickfast;
+        sampleupdate();
+        $$('servspeed').innerHTML = 'S';
+      } else if (tickto == 'S') {
+        ticknext = tickslow;
+        nosampleupdate();
+        $$('servspeed').innerHTML = 'F';
+      } else { ticknext = tickslow; }
+    }
+  </script>
+</head>
+<body>
+  <div id="sendbox">
+    <div id="servopt">
+      <div><iframe id="servtgt" name="servtgt" src="/io/send?++" onload="success();"></iframe></div>
+      <div id="servsend">
+        <form id="fsend" action="/io/send?+" method="post" target="servtgt">
+          <input id="fname" name="n" type="hidden" value="" />
+          <textarea id="sendbuf" name="s"></textarea>
+        </form>
+        <div id="servspeed" class="button" onclick="togglespeed();">S</div>
+        <textarea id="pendbuf"></textarea>
+      </div>
+    </div>
+  </div>
+  <div id="map">
+  </div>
+</body>
+</html>
