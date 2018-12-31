@@ -2,11 +2,20 @@
 <head>
   <title>send</title>
   <style type="text/css">
-    body { width: 100%; height: 100%; }
+    body { width: 100%; height: 100%;
+      background-color: #000; color: #fff; }
     #sendbox {
       float: left; clear: left;
       width: 284px;
-      border: #000 solid 1px;
+      border: #fc3 solid 1px;
+      border-radius: 8px;
+      background-color: #888;
+    }
+    #recvbox {
+      position: absolute;
+      top: 0; right: 0;
+      bottom: 0; left: 320px;
+      border: #000 solid 2px;
       border-radius: 8px;
     }
     #map {
@@ -62,6 +71,19 @@
       font-size: 12px;
       font-weight: bold;
       width: 280px; height: 80px;
+      color: #0f0;
+      background-color: #888;
+    }
+    #copybuf {
+      border: #000 solid 1px;
+      border-radius: 4px;
+      margin: 1px;
+      margin-top: 0px;
+      font-size: 12px;
+      font-weight: bold;
+      width: 280px; min-height: 256px; bottom: 0;
+      color: #fc3;
+      background-color: #888;
     }
     #servsend > form {
       margin: 0; padding: 0;
@@ -100,7 +122,7 @@
     var trigger = undefined;
     var gpsopt = {
       enableHighAccuracy: true,
-      timeout: 1000,
+      timeout: 10000,
       maximumAge: 10000
     };
     var pendcount = 0;
@@ -137,14 +159,15 @@
           $$('pendbuf').innerHTML = cval.substr(0, ovix) + newo;
         } else { $$('pendbuf').innerHTML += ' +1'; }
       } else {
-        if (pendcount > 0) { $$('pendbuf').innerHTML += ' ' };
+        if (pendcount > 0) { $$('pendbuf').innerHTML += ' '; }
         $$('pendbuf').innerHTML += accu + '.' + lati + '.' + long;
       }
       //}
       llatc = lati; llongc = long; laccv = accu;
       if (++pendcount % 5 == 0) { // AND cancurrentlysend .....
-        $$('pendbuf').innerHTML += ' }';
-        $$('sendbuf').innerHTML = $$('pendbuf').innerHTML;
+        $$('pendbuf').innerHTML += ' } ';
+        $$('copybuf').innerHTML += $$('pendbuf').innerHTML;
+        $$('sendbuf').innerHTML = $$('copybuf').innerHTML;
         $$('sendbuf').style.backgroundColor = '#fc3';
         $$('pendbuf').innerHTML = '';
         pendcount = 0;
@@ -153,7 +176,13 @@
     };
     var success = function() {
       var servdata = $$('servtgt').contentWindow.document.body.innerHTML;
-      var servjson = JSON.parse(servdata);
+      var servjson = { samples: [] };
+      if (servdata.charAt(0) == '[') {
+        var servsamples = servdata.substr(1, servdata.length - 2);
+        servjson.samples = servsamples.split('][');
+      } else {
+        servjson = JSON.parse(servdata);
+      }
       $$('sendbuf').innerHTML = '';
       var pname = pagename();
       var tgtsrc = $$('servtgt').src;
@@ -176,14 +205,17 @@
         } // else { $$('fsend').submit(); }
           else { // indeed it has not
           $$('sendbuf').style.backgroundColor = '#3f3';
+          $$('copybuf').innerHTML = '';
           if (servjson.op) {
             console.log('-- ' + servjson.op + ' >> ' + servjson.in);
             sampleupdate(); // start sampling (= or +)
           } else if (servjson.fail) {
             console.log('-- !! ' + servjson.fail);
-          } else {
+          } else if (servjson.samples) {
             // there are n samples now stored
-            console.log('-- ' + servdata + ' --');
+            console.log('-- [' + servjson.samples + '] --');
+          } else {
+            console.log('-- ? ' + servjson + ' ? --');
           }
         }
       }
@@ -248,8 +280,12 @@
         </form>
         <div id="servspeed" class="button" onclick="togglespeed();">S</div>
         <textarea id="pendbuf"></textarea>
+        <textarea id="copybuf"></textarea>
       </div>
     </div>
+  </div>
+  <div id="recvbox">
+    <iframe id="recv" src="/io/recv" width="100%" height="100%"></iframe>
   </div>
   <div id="map">
   </div>

@@ -54,7 +54,7 @@ IN send($) {
   IN datalevel = 0;
   IN dateval = 0;
   IN timeval = 0;
-  CH datemode = 'D'; // N for subname- prefix
+  CH datemode = 'D'; // N for subname- prefix, change at reset also
   FS datafile = NULL;
   IN ci = -1;
   WI (INC ci LT clength) {
@@ -84,7 +84,7 @@ IN send($) {
         INC datalevel;
         IF (datalevel EQ 1) {
           IF (nameval[0] EQNUL) { LOGF("NONAME"); RT 0; }
-          CHDIRORFAIL(nameval) { LOGF("NOSESSION: %s", strerror(errno)); RT 0; }
+          CHDIRORFAIL(nameval) { LOGF("NOSESSION(%s): %s", nameval, strerror(errno)); RT 0; }
           CH filename[SENDMAXNAMELEN];
           IF (subnameval[0] NQNUL) {
             STRF(filename, "%s-%06d+%06d", subnameval, dateval, timeval);
@@ -105,6 +105,10 @@ IN send($) {
               { INC filecount; } // count files only
           }; closedir(dirp);
           printf("[%d]", filecount);
+          CHDIRORFAIL("..") { LOGF("!..: %s", strerror(errno)); }
+          dateval = 0;
+          timeval = 0;
+          datemode = 'D'; // change to N if using subname prefix (same as above)
         }
       } EF (datalevel EQ 0) {
         IF (cc EQ '-') {
