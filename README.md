@@ -1,5 +1,5 @@
 # sendrecv
-send and recv coordinate data
+send and receive coordinate data
 
 send program will create an applet to upload one packet per five geolocation samples. It will also open recv.
 
