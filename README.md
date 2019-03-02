@@ -5,6 +5,8 @@ send program will create an applet to upload one packet per five geolocation sam
 
 recv program will create a page that renders colour (ANSI) text of the stored data from send organised into folders (jia) and days (ri).
 
+Both send and recv should run in /cgi-bin/ or equivalent.
+
 Requires HTTPS in many browsers unless coordinates are externally sourced
 
 Next step: externally sourced coordinates + mouse hijack
